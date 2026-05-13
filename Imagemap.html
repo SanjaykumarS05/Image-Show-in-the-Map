@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cut Outside Polygon Overlay</title>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .overlay-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        .overlay-image {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=Your_API_Key"></script>
+
+<script>
+
+// =====================================
+// POLYGON COORDINATES
+// =====================================
+
+const polygonCoords = [
+
+    { lat: 13.129771368352976, lng: 80.08675226993103 },
+    { lat: 13.129781321934303, lng: 80.08632299121803 },
+    { lat: 13.129422988083263, lng: 80.08647630479948 },
+    { lat: 13.129233867229146, lng: 80.08574039960598 },
+    { lat: 13.128606781250113, lng: 80.0856484114571 },
+    { lat: 13.127571588112659, lng: 80.08562796990446 },
+    { lat: 13.126695652203509, lng: 80.08620034089375 },
+    { lat: 13.126188006177543, lng: 80.08737574516516 },
+    { lat: 13.126934544274349, lng: 80.08967544889452 },
+    { lat: 13.129174144954092, lng: 80.08955279802814 },
+    { lat: 13.130109794302072, lng: 80.08857159110431 }
+
+];
+
+// =====================================
+// CALCULATE BOUNDS
+// =====================================
+
+const latitudes = polygonCoords.map(p => p.lat);
+const longitudes = polygonCoords.map(p => p.lng);
+
+const bounds = {
+    north: Math.max(...latitudes),
+    south: Math.min(...latitudes),
+    east: Math.max(...longitudes),
+    west: Math.min(...longitudes)
+};
+
+// =====================================
+// CUSTOM OVERLAY
+// =====================================
+
+class PolygonImageOverlay extends google.maps.OverlayView {
+
+    constructor(bounds, image, map) {
+        super();
+        this.bounds = bounds;
+        this.image = image;
+        this.map = map;
+        this.div = null;
+        this.setMap(map);
+    }
+
+    onAdd() {
+
+        const div = document.createElement("div");
+        div.className = "overlay-container";
+
+        const img = document.createElement("img");
+        img.src = this.image;
+        img.className = "overlay-image";
+
+        div.appendChild(img);
+
+        this.div = div;
+
+        const panes = this.getPanes();
+        panes.overlayLayer.appendChild(div);
+    }
+
+    draw() {
+
+        const overlayProjection = this.getProjection();
+
+        const sw = overlayProjection.fromLatLngToDivPixel(
+            new google.maps.LatLng(
+                this.bounds.south,
+                this.bounds.west
+            )
+        );
+
+        const ne = overlayProjection.fromLatLngToDivPixel(
+            new google.maps.LatLng(
+                this.bounds.north,
+                this.bounds.east
+            )
+        );
+
+        const div = this.div;
+
+        div.style.left = sw.x + "px";
+        div.style.top = ne.y + "px";
+        div.style.width = (ne.x - sw.x) + "px";
+        div.style.height = (sw.y - ne.y) + "px";
+
+        // =====================================
+        // CREATE CLIP PATH
+        // =====================================
+
+        const clipPoints = polygonCoords.map(coord => {
+
+            const point = overlayProjection.fromLatLngToDivPixel(
+                new google.maps.LatLng(coord.lat, coord.lng)
+            );
+
+            const x = ((point.x - sw.x) / (ne.x - sw.x)) * 100;
+            const y = ((point.y - ne.y) / (sw.y - ne.y)) * 100;
+
+            return `${x}% ${y}%`;
+
+        }).join(",");
+
+        div.style.clipPath = `polygon(${clipPoints})`;
+    }
+
+    onRemove() {
+        if (this.div) {
+            this.div.parentNode.removeChild(this.div);
+            this.div = null;
+        }
+    }
+}
+
+// =====================================
+// INIT MAP
+// =====================================
+
+function initMap() {
+
+    const map = new google.maps.Map(
+        document.getElementById("map"),
+        {
+            zoom: 17,
+            center: polygonCoords[0],
+            mapTypeId: "satellite"
+        }
+    );
+    // =====================================
+    // IMAGE OVERLAY WITH POLYGON CUT
+    // =====================================
+
+    new PolygonImageOverlay(
+        bounds,
+        "layout1.png",
+        map
+    );
+
+    // =====================================
+    // BORDER
+    // =====================================
+
+    new google.maps.Polygon({
+        paths: polygonCoords,
+        strokeColor: "#D9D9D9",
+        strokeOpacity: 1,
+        strokeWeight: 2,
+        fillOpacity: 0,
+        map: map
+    });
+
+}
+
+initMap();
+
+</script>
+
+</body>
+</html>
