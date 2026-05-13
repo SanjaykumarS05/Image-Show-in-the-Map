@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KML File Upload Google Map</title>
+
+    <style>
+        #map {
+            height: 90vh;
+            width: 100%;
+        }
+
+        #fileInput {
+            margin: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<input type="file" id="fileInput" accept=".kml">
+
+<div id="map"></div>
+
+<script>
+
+let map;
+
+function initMap() {
+
+    map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 4,
+        center: { lat: 20.5937, lng: 78.9629 }
+    });
+
+}
+
+document.getElementById("fileInput").addEventListener("change", function(event) {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+
+        const kmlText = e.target.result;
+
+        const parser = new DOMParser();
+
+        const xmlDoc = parser.parseFromString(kmlText, "text/xml");
+
+        // ===== POINTS =====
+        const points = xmlDoc.getElementsByTagName("Point");
+
+        for (let i = 0; i < points.length; i++) {
+
+            const coordinates =
+                points[i]
+                .getElementsByTagName("coordinates")[0]
+                .textContent
+                .trim();
+
+            const coord = coordinates.split(",");
+
+            const position = {
+                lat: parseFloat(coord[1]),
+                lng: parseFloat(coord[0])
+            };
+
+            // Placemark Name
+            let placemarkName = "Point";
+
+            const placemark =
+                points[i].parentNode;
+
+            const nameTag =
+                placemark.getElementsByTagName("name")[0];
+
+            if (nameTag) {
+                placemarkName = nameTag.textContent;
+            }
+
+            // Placemark Description
+            let description = "";
+
+            const descTag =
+                placemark.getElementsByTagName("description")[0];
+
+            if (descTag) {
+                description = descTag.textContent;
+            }
+
+            const marker = new google.maps.Marker({
+                position: position,
+                map: map,
+                title: placemarkName
+            });
+
+            const infoWindow = new google.maps.InfoWindow({
+                content:
+                    "<h3>" + placemarkName + "</h3>" +
+                    "<p>" + description + "</p>"
+            });
+
+            marker.addListener("click", function() {
+                infoWindow.open(map, marker);
+            });
+
+            map.setCenter(position);
+
+        }
+
+        // ===== LINES =====
+        const lines = xmlDoc.getElementsByTagName("LineString");
+
+        for (let i = 0; i < lines.length; i++) {
+
+            const coordinates =
+                lines[i]
+                .getElementsByTagName("coordinates")[0]
+                .textContent
+                .trim();
+
+            const path = [];
+
+            const coordsArray = coordinates.split(/\s+/);
+
+            coordsArray.forEach(coordStr => {
+
+                const coord = coordStr.split(",");
+
+                if (coord.length >= 2) {
+
+                    path.push({
+                        lat: parseFloat(coord[1]),
+                        lng: parseFloat(coord[0])
+                    });
+
+                }
+
+            });
+
+            new google.maps.Polyline({
+                path: path,
+                geodesic: true,
+                strokeColor: "#FF0000",
+                strokeOpacity: 1.0,
+                strokeWeight: 3,
+                map: map
+            });
+
+        }
+
+        // ===== POLYGONS =====
+        const polygons = xmlDoc.getElementsByTagName("Polygon");
+
+        for (let i = 0; i < polygons.length; i++) {
+
+            const coordinates =
+                polygons[i]
+                .getElementsByTagName("coordinates")[0]
+                .textContent
+                .trim();
+
+            const polygonPath = [];
+
+            const coordsArray = coordinates.split(/\s+/);
+
+            coordsArray.forEach(coordStr => {
+
+                const coord = coordStr.split(",");
+
+                if (coord.length >= 2) {
+
+                    polygonPath.push({
+                        lat: parseFloat(coord[1]),
+                        lng: parseFloat(coord[0])
+                    });
+
+                }
+
+            });
+
+            new google.maps.Polygon({
+                paths: polygonPath,
+                strokeColor: "#0000FF",
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: "#0000FF",
+                fillOpacity: 0.35,
+                map: map
+            });
+
+        }
+
+    };
+
+    reader.readAsText(file);
+
+});
+
+</script>
+
+<script async
+src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&loading=async&callback=initMap">
+</script>
+
+</body>
+</html>
